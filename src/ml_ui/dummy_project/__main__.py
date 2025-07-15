@@ -7,6 +7,7 @@ import ast
 
 logger = logging.getLogger(__name__)
 
+
 def setup_logging():
     log_file_path = LOGS_DIR / f"{datetime.today().date()}.log"
 
@@ -14,13 +15,18 @@ def setup_logging():
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    console_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    )
     logger.addHandler(console_handler)
 
     file_handler = logging.FileHandler(log_file_path)
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    )
     logger.addHandler(file_handler)
+
 
 def main():
     logger.info("Starting ML UI")
@@ -28,18 +34,26 @@ def main():
     ui.label("ML Prediction UI")
 
     with ui.row():
-        input_box = ui.input(label="Input [1, 2, 3]").props('style="width:300px"')
+        input_box = ui.input(label="Input [1, 2, 3]").props(
+            'style="width:300px"'
+        )
         output_box = ui.label("...")
 
     def predict():
         logger.info("Predict button pressed")
         try:
             data = ast.literal_eval(input_box.value)
-            if not isinstance(data, list) or not all(isinstance(x, (int, float)) for x in data):
+            if not isinstance(data, list) or not all(
+                isinstance(x, (int, float)) for x in data
+            ):
                 raise ValueError("Expected list of numbers")
-            response = requests.post("http://localhost:8000/predict", json={"data": data})
+            response = requests.post(
+                "http://localhost:8000/predict", json={"data": data}
+            )
             result = response.json()
-            output_box.text = f"Prediction: {result.get('predictions', result)}"
+            output_box.text = (
+                f"Prediction: {result.get('predictions', result)}"
+            )
             logger.info(f"Prediction success: {result}")
         except Exception as e:
             output_box.text = f"Error: {e}"
@@ -49,7 +63,7 @@ def main():
 
     ui.run(port=8080, reload=False)
 
+
 if __name__ in {"__main__", "__mp_main__"}:
     setup_logging()
     main()
-
