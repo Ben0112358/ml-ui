@@ -38,10 +38,9 @@ def main():
             'autogrow style="width:400px; max-height:200px; overflow:auto"'
         )
         output_box = ui.textarea(label="Output").props(
-            'readonly autogrow style="width:400px; max-height:200px; overflow:auto"'
+            "readonly autogrow style="
+            '"width:400px; max-height:200px; overflow:auto"'
         )
-
-
 
     def predict():
         logger.info("Predict button pressed")
@@ -55,7 +54,9 @@ def main():
                 "http://localhost:8000/predict", json={"data": data}
             )
             result = response.json()
-            output_box.value = f"Prediction: {result.get('predictions', result)}"
+            output_box.value = (
+                f"Prediction: {result.get('predictions', result)}"
+            )
             logger.info(f"Prediction success: {result}")
         except Exception as e:
             output_box.text = f"Error: {e}"
