@@ -1,0 +1,15 @@
+services:
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.dummy_project
+    volumes:
+    - "${ML_HOMELAB_ROOT}:${ML_HOMELAB_ROOT}:rw"
+    environment:
+      - ML_HOMELAB_ROOT=${ML_HOMELAB_ROOT}
+    networks:
+      - dummy_project
+
+networks:
+  dummy_project:
+    external: true
