@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from ml_ui.config import LOGS_DIR, ENV_VAR_OUTPUT_SUFFIX
 
 
