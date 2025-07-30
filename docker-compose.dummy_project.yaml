@@ -16,7 +16,7 @@ services:
       - TIMESTAMP=${TIMESTAMP}
       - OUTPUT_SUFFIX=${OUTPUT_SUFFIX}
     ports:
-      - "8080:8080"
+      - "${UI_PORT}:8080"
     networks: 
       - external_net
 
