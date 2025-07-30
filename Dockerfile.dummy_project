@@ -22,5 +22,6 @@ COPY --from=builder /root/.local /root/.local
 COPY --from=builder /app /app
 COPY --from=builder /root/.config /root/.config
 
+EXPOSE 8080
 
 CMD ["poetry", "run", "python", "-m", "ml_ui.dummy_project.ui"]
