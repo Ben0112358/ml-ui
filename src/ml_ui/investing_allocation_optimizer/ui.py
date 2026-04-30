@@ -27,8 +27,10 @@ def main():
             "bootstrap_path_length": 100,
             "n_bootstrap_paths": 1000
         }
-    }"""
-        ).props('autogrow style="width:400px; max-height:200px; overflow:auto"')
+    }""",
+        ).props(
+            'autogrow style="width:400px; max-height:200px; overflow:auto"'
+        )
 
         output_box = ui.textarea(label="Output").props(
             "readonly autogrow style="
