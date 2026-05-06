@@ -62,7 +62,7 @@ export UI_PORT=<port_number>
 
 ---
 
-## 🐳 Containerized run (more control)
+## Containerized run (more control)
 
 `ml-ui` can be run for example in the following way. You may add args as you see fit.
 
