@@ -14,7 +14,7 @@ To get an overview of how all sub-repos in the full pipeline are tied together, 
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ml-ui/
@@ -38,7 +38,7 @@ ml-ui/
 
 ---
 
-## ✅ Prerequisites
+## Prerequisites
 
 - **OS**: Linux or macOS  
 - **Docker**: Installed and running  
@@ -58,7 +58,7 @@ export DOCKER_NETWORK_NAME=<network_name>
 export UI_PORT=<port_number>
 ```
 
-⚠️ **Important:** In order for the UI to communicate with endpoints created in `ml-serving`, both `ml-serving` and `ml-ui` must use the **same `DOCKER_NETWORK_NAME`**.
+**Important:** In order for the UI to communicate with endpoints created in `ml-serving`, both `ml-serving` and `ml-ui` must use the **same `DOCKER_NETWORK_NAME`**.
 
 ---
 
@@ -87,7 +87,7 @@ export OUTPUT_SUFFIX=some_suffix
 
 ---
 
-## 🐍 Python run (less control; simplified)
+## Python run (less control; simplified)
 
 Run `ml-ui` locally with sensible defaults:
 
@@ -114,7 +114,7 @@ Also here, the UI will be exposed on `localhost:$UI_PORT`.
 
 ---
 
-## ➕ Adding a New Project
+## Adding a New Project
 1. Create a folder under `ml_ui/` with your project name:
 
 ```
@@ -136,7 +136,7 @@ src/ml_ui/<new_project>/
 
 ---
 
-## 🧪 Testing
+## Testing
 
 Run unit tests with Poetry:
 
