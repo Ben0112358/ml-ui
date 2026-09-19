@@ -43,9 +43,7 @@ def main():
             data = ast.literal_eval(input_box.value)
             if not isinstance(data, dict):
                 raise ValueError("Expected dict.")
-            response = requests.post(
-                "http://serving:8000/predict", json={"data": data}
-            )
+            response = requests.post("http://serving:8000/predict", json=data)
             result = response.json()
             output_box.value = (
                 f"Prediction: {result.get('predictions', result)}"
