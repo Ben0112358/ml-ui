@@ -123,7 +123,7 @@ src/ml_ui/<new_project>/
 
 2. Implement the modules (mirroring `dummy_project`):
 
-- `ui.py` → core UI logic  
+- `ui.py` → core UI logic (Streamlit for current projects)  
 - `utils/` → project-specific utils  
 - `__main__.py` → optional CLI entrypoint for local dev  
 - `__init__.py` → marks the package  

@@ -24,4 +24,4 @@ COPY --from=builder /root/.config /root/.config
 
 EXPOSE 8080
 
-CMD ["poetry", "run", "python", "-m", "ml_ui.dummy_project.ui"]
+CMD ["poetry", "run", "streamlit", "run", "src/ml_ui/dummy_project/ui.py", "--server.port=8080", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
