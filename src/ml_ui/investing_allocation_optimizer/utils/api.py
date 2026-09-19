@@ -1,70 +1,95 @@
 import os
 import re
 import uuid
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import requests
 
-_ALLOWED_SERVING_HOSTS = frozenset({"127.0.0.1", "localhost", "serving"})
+AllowedHost = Literal["127.0.0.1", "localhost", "serving"]
+_ALLOWED_SERVING_HOSTS: frozenset[str] = frozenset(
+    {"127.0.0.1", "localhost", "serving"}
+)
 _JOB_ID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re.IGNORECASE,
 )
 
 
-def _normalize_serving_url(raw: str) -> str:
+@dataclass(frozen=True)
+class ServingEndpoint:
+    """Fixed scheme/host/port used to build outbound serving URLs."""
+
+    scheme: Literal["http", "https"]
+    host: AllowedHost
+    port: int
+
+    def origin(self) -> str:
+        return f"{self.scheme}://{self.host}:{self.port}"
+
+    def url_path(self, path: str) -> str:
+        if not path.startswith("/") or "://" in path:
+            raise ValueError("Invalid serving path.")
+        return f"{self.origin()}{path}"
+
+
+def endpoint_from_host_port(host: str, port: int) -> ServingEndpoint:
+    if host not in _ALLOWED_SERVING_HOSTS:
+        raise ValueError(
+            "Serving host is not allowed. "
+            "Use 127.0.0.1, localhost, or serving."
+        )
+    if not isinstance(port, int) or not (1 <= port <= 65535):
+        raise ValueError("Serving port must be between 1 and 65535.")
+    scheme: Literal["http", "https"] = "http"
+    return ServingEndpoint(scheme, host, port)  # type: ignore[arg-type]
+
+
+def _endpoint_from_parsed_url(raw: str) -> ServingEndpoint:
     cleaned = raw.strip().rstrip("/")
     parsed = urlparse(cleaned)
     if parsed.scheme not in {"http", "https"}:
-        raise ValueError("Serving base URL must use http or https.")
+        raise ValueError("Serving URL must use http or https.")
     if parsed.username or parsed.password:
-        raise ValueError("Serving base URL must not include credentials.")
+        raise ValueError("Serving URL must not include credentials.")
     if parsed.path not in {"", "/"}:
-        raise ValueError("Serving base URL must not include a path.")
+        raise ValueError("Serving URL must not include a path.")
     if parsed.params or parsed.query or parsed.fragment:
+        raise ValueError("Serving URL must not include query or fragment.")
+    if not parsed.hostname or parsed.hostname not in _ALLOWED_SERVING_HOSTS:
         raise ValueError(
-            "Serving base URL must not include query or fragment."
-        )
-    if not parsed.hostname:
-        raise ValueError("Serving base URL must include a hostname.")
-    if parsed.hostname not in _ALLOWED_SERVING_HOSTS:
-        raise ValueError(
-            "Serving base URL host is not allowed. "
+            "Serving URL host is not allowed. "
             "Use 127.0.0.1, localhost, or serving."
         )
     port = parsed.port
-    if port is not None and not (1 <= port <= 65535):
-        raise ValueError("Serving base URL port is out of range.")
     if port is None:
-        return f"{parsed.scheme}://{parsed.hostname}"
-    return f"{parsed.scheme}://{parsed.hostname}:{port}"
+        port = 443 if parsed.scheme == "https" else 80
+    if not (1 <= port <= 65535):
+        raise ValueError("Serving port is out of range.")
+    scheme: Literal["http", "https"] = parsed.scheme  # type: ignore
+    host: AllowedHost = parsed.hostname  # type: ignore
+    return ServingEndpoint(scheme, host, port)
+
+
+def default_serving_endpoint() -> ServingEndpoint:
+    explicit = os.environ.get("SERVING_URL", "").strip()
+    if explicit:
+        return _endpoint_from_parsed_url(explicit)
+    if os.path.exists("/.dockerenv"):
+        return endpoint_from_host_port("serving", 8000)
+    port_str = os.environ.get("SERVING_PORT", "8000").strip() or "8000"
+    if not port_str.isdigit():
+        raise ValueError("SERVING_PORT must be numeric.")
+    return endpoint_from_host_port("127.0.0.1", int(port_str))
 
 
 def serving_base_url() -> str:
-    """
-    Where the UI should call ml-serving.
-
-    - SERVING_URL: explicit override (set in UI container compose).
-    - On the host: http://127.0.0.1:$SERVING_PORT (pipeline maps serving here).
-    - In a container: http://serving:8000 (compose service on shared network).
-    """
-    explicit = os.environ.get("SERVING_URL", "").strip()
-    if explicit:
-        return _normalize_serving_url(explicit)
-
-    if os.path.exists("/.dockerenv"):
-        return "http://serving:8000"
-
-    port = os.environ.get("SERVING_PORT", "8000").strip() or "8000"
-    return _normalize_serving_url(f"http://127.0.0.1:{port}")
+    return default_serving_endpoint().origin()
 
 
-def validated_serving_base_url(base_url: str | None = None) -> str:
-    """Restrict sidebar/env URLs to local homelab serving targets."""
-    if base_url is None:
-        return serving_base_url()
-    return _normalize_serving_url(base_url)
+def parse_serving_base_url(raw: str) -> ServingEndpoint:
+    return _endpoint_from_parsed_url(raw)
 
 
 def _validated_job_id(job_id: str) -> str:
@@ -78,9 +103,9 @@ def _validated_job_id(job_id: str) -> str:
 DEFAULT_SERVING_URL = serving_base_url()
 
 
-def fetch_options(base_url: str | None = None) -> dict[str, Any]:
-    url = validated_serving_base_url(base_url)
-    resp = requests.get(f"{url}/options", timeout=30)
+def fetch_options(endpoint: ServingEndpoint | None = None) -> dict[str, Any]:
+    ep = endpoint or default_serving_endpoint()
+    resp = requests.get(ep.url_path("/options"), timeout=30)
     resp.raise_for_status()
     return resp.json()
 
@@ -122,11 +147,11 @@ def build_job_payload(
 
 def start_job(
     payload: dict[str, Any],
-    base_url: str | None = None,
+    endpoint: ServingEndpoint | None = None,
 ) -> str:
-    url = validated_serving_base_url(base_url)
+    ep = endpoint or default_serving_endpoint()
     resp = requests.post(
-        f"{url}/jobs",
+        ep.url_path("/jobs"),
         json=payload,
         timeout=60,
     )
@@ -137,22 +162,25 @@ def start_job(
 
 def poll_job(
     job_id: str,
-    base_url: str | None = None,
+    endpoint: ServingEndpoint | None = None,
 ) -> dict[str, Any]:
-    url = validated_serving_base_url(base_url)
+    ep = endpoint or default_serving_endpoint()
     safe_id = _validated_job_id(job_id)
     resp = requests.get(
-        f"{url}/jobs/{safe_id}",
+        ep.url_path(f"/jobs/{safe_id}"),
         timeout=30,
     )
     resp.raise_for_status()
     return resp.json()
 
 
-def cancel_job(job_id: str, base_url: str | None = None) -> None:
-    url = validated_serving_base_url(base_url)
+def cancel_job(
+    job_id: str,
+    endpoint: ServingEndpoint | None = None,
+) -> None:
+    ep = endpoint or default_serving_endpoint()
     safe_id = _validated_job_id(job_id)
     requests.delete(
-        f"{url}/jobs/{safe_id}",
+        ep.url_path(f"/jobs/{safe_id}"),
         timeout=30,
     )

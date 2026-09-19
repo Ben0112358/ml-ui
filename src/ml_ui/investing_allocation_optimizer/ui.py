@@ -6,9 +6,10 @@ import streamlit as st
 from ml_ui.investing_allocation_optimizer.utils.api import (
     build_job_payload,
     cancel_job,
+    default_serving_endpoint,
+    endpoint_from_host_port,
     fetch_options,
     poll_job,
-    serving_base_url,
     start_job,
 )
 from ml_ui.investing_allocation_optimizer.utils.format import (
@@ -24,6 +25,9 @@ POLL_SECONDS = 0.5
 def _sanitize_for_log(value: object) -> str:
     return str(value).replace("\r", "").replace("\n", "")
 
+
+# (selectbox key, label, value sent to serving)
+_SERVING_HOST_OPTIONS = ["127.0.0.1", "localhost", "serving"]
 
 # (selectbox key, label, value sent to serving)
 _BLOCK_SIZE_OPTIONS: list[tuple[str, str, str | int]] = [
@@ -53,30 +57,45 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Connection")
-        default_url = st.session_state.get(
-            "serving_url",
-            serving_base_url(),
+        default_ep = st.session_state.get(
+            "serving_endpoint",
+            default_serving_endpoint(),
         )
-        serving_url = st.text_input(
-            "Serving base URL",
-            value=default_url,
-            help=(
-                "Local Streamlit: http://127.0.0.1:<port> (see pipeline "
-                "Serving URL). UI container: http://serving:8000."
-            ),
-        ).rstrip("/")
-        st.session_state["serving_url"] = serving_url
+        host_index = (
+            _SERVING_HOST_OPTIONS.index(default_ep.host)
+            if default_ep.host in _SERVING_HOST_OPTIONS
+            else 0
+        )
+        serving_host = st.selectbox(
+            "Serving host",
+            _SERVING_HOST_OPTIONS,
+            index=host_index,
+            help="Use 127.0.0.1 on the host; serving inside Docker UI.",
+        )
+        serving_port = st.number_input(
+            "Serving port",
+            min_value=1,
+            max_value=65535,
+            value=int(default_ep.port),
+            step=1,
+            help="Mapped port from execute.sh (Serving URL), often not 8000.",
+        )
+        serving_endpoint = endpoint_from_host_port(
+            serving_host,
+            int(serving_port),
+        )
+        st.session_state["serving_endpoint"] = serving_endpoint
+        st.caption(f"Base URL: `{serving_endpoint.origin()}`")
 
         st.header("Optimization")
 
     try:
-        options = fetch_options(serving_url)
+        options = fetch_options(serving_endpoint)
     except Exception as exc:
         st.error(f"Could not load options from serving: {exc}")
         st.info(
-            "Start **ml-serving** (same compose network or mapped port), "
-            "then set **Serving base URL** in the sidebar—for example "
-            "`http://127.0.0.1:33044` from `execute.sh` output."
+            "Start **ml-serving**, then set **Serving host** and **port** "
+            "from the pipeline output (e.g. host 127.0.0.1, port 33044)."
         )
         st.stop()
 
@@ -201,7 +220,7 @@ def main() -> None:
 
     if cancel_clicked and st.session_state.get("job_id"):
         try:
-            cancel_job(st.session_state["job_id"], serving_url)
+            cancel_job(st.session_state["job_id"], serving_endpoint)
             st.warning("Cancellation requested.")
         except Exception as exc:
             st.error(str(exc))
@@ -225,7 +244,7 @@ def main() -> None:
             metric_params=metric_params,
         )
         try:
-            job_id = start_job(payload, serving_url)
+            job_id = start_job(payload, serving_endpoint)
             st.session_state["job_id"] = job_id
             logger.info("Started job %s", _sanitize_for_log(job_id))
         except Exception as exc:
@@ -234,7 +253,7 @@ def main() -> None:
 
     job_id = st.session_state.get("job_id")
     if job_id:
-        job = poll_job(job_id, serving_url)
+        job = poll_job(job_id, serving_endpoint)
         done = job.get("trials_done", 0)
         total = job.get("n_trials", 1)
         progress_bar.progress(min(1.0, done / max(total, 1)))
@@ -249,7 +268,7 @@ def main() -> None:
 
         while job.get("status") == "running":
             time.sleep(POLL_SECONDS)
-            job = poll_job(job_id, serving_url)
+            job = poll_job(job_id, serving_endpoint)
             done = job.get("trials_done", 0)
             progress_bar.progress(min(1.0, done / max(total, 1)))
             status_slot.write(
