@@ -1,6 +1,9 @@
+import pytest
+
 from ml_ui.investing_allocation_optimizer.utils.api import (
     build_job_payload,
     serving_base_url,
+    validated_serving_base_url,
 )
 from ml_ui.investing_allocation_optimizer.utils.format import (
     comparison_stats_table,
@@ -16,6 +19,18 @@ def test_serving_base_url_local_default(monkeypatch):
         lambda _p: False,
     )
     assert serving_base_url() == "http://127.0.0.1:8000"
+
+
+def test_validated_serving_url_allows_local_pipeline_port():
+    assert (
+        validated_serving_base_url("http://127.0.0.1:33044")
+        == "http://127.0.0.1:33044"
+    )
+
+
+def test_validated_serving_url_rejects_untrusted_host():
+    with pytest.raises(ValueError, match="not allowed"):
+        validated_serving_base_url("http://169.254.169.254:8000")
 
 
 def test_build_job_payload_minimal():

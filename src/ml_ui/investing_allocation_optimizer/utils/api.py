@@ -1,7 +1,44 @@
 import os
+import re
+import uuid
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
+
+_ALLOWED_SERVING_HOSTS = frozenset({"127.0.0.1", "localhost", "serving"})
+_JOB_ID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_serving_url(raw: str) -> str:
+    cleaned = raw.strip().rstrip("/")
+    parsed = urlparse(cleaned)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("Serving base URL must use http or https.")
+    if parsed.username or parsed.password:
+        raise ValueError("Serving base URL must not include credentials.")
+    if parsed.path not in {"", "/"}:
+        raise ValueError("Serving base URL must not include a path.")
+    if parsed.params or parsed.query or parsed.fragment:
+        raise ValueError(
+            "Serving base URL must not include query or fragment."
+        )
+    if not parsed.hostname:
+        raise ValueError("Serving base URL must include a hostname.")
+    if parsed.hostname not in _ALLOWED_SERVING_HOSTS:
+        raise ValueError(
+            "Serving base URL host is not allowed. "
+            "Use 127.0.0.1, localhost, or serving."
+        )
+    port = parsed.port
+    if port is not None and not (1 <= port <= 65535):
+        raise ValueError("Serving base URL port is out of range.")
+    if port is None:
+        return f"{parsed.scheme}://{parsed.hostname}"
+    return f"{parsed.scheme}://{parsed.hostname}:{port}"
 
 
 def serving_base_url() -> str:
@@ -14,13 +51,27 @@ def serving_base_url() -> str:
     """
     explicit = os.environ.get("SERVING_URL", "").strip()
     if explicit:
-        return explicit.rstrip("/")
+        return _normalize_serving_url(explicit)
 
     if os.path.exists("/.dockerenv"):
         return "http://serving:8000"
 
     port = os.environ.get("SERVING_PORT", "8000").strip() or "8000"
-    return f"http://127.0.0.1:{port}"
+    return _normalize_serving_url(f"http://127.0.0.1:{port}")
+
+
+def validated_serving_base_url(base_url: str | None = None) -> str:
+    """Restrict sidebar/env URLs to local homelab serving targets."""
+    if base_url is None:
+        return serving_base_url()
+    return _normalize_serving_url(base_url)
+
+
+def _validated_job_id(job_id: str) -> str:
+    if not _JOB_ID_RE.match(job_id):
+        raise ValueError("Invalid job id.")
+    uuid.UUID(job_id)
+    return job_id
 
 
 # Back-compat for tests/imports
@@ -28,7 +79,7 @@ DEFAULT_SERVING_URL = serving_base_url()
 
 
 def fetch_options(base_url: str | None = None) -> dict[str, Any]:
-    url = (base_url or serving_base_url()).rstrip("/")
+    url = validated_serving_base_url(base_url)
     resp = requests.get(f"{url}/options", timeout=30)
     resp.raise_for_status()
     return resp.json()
@@ -73,23 +124,25 @@ def start_job(
     payload: dict[str, Any],
     base_url: str | None = None,
 ) -> str:
-    url = (base_url or serving_base_url()).rstrip("/")
+    url = validated_serving_base_url(base_url)
     resp = requests.post(
         f"{url}/jobs",
         json=payload,
         timeout=60,
     )
     resp.raise_for_status()
-    return resp.json()["job_id"]
+    job_id = resp.json()["job_id"]
+    return _validated_job_id(job_id)
 
 
 def poll_job(
     job_id: str,
     base_url: str | None = None,
 ) -> dict[str, Any]:
-    url = (base_url or serving_base_url()).rstrip("/")
+    url = validated_serving_base_url(base_url)
+    safe_id = _validated_job_id(job_id)
     resp = requests.get(
-        f"{url}/jobs/{job_id}",
+        f"{url}/jobs/{safe_id}",
         timeout=30,
     )
     resp.raise_for_status()
@@ -97,8 +150,9 @@ def poll_job(
 
 
 def cancel_job(job_id: str, base_url: str | None = None) -> None:
-    url = (base_url or serving_base_url()).rstrip("/")
+    url = validated_serving_base_url(base_url)
+    safe_id = _validated_job_id(job_id)
     requests.delete(
-        f"{url}/jobs/{job_id}",
+        f"{url}/jobs/{safe_id}",
         timeout=30,
     )

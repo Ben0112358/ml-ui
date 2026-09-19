@@ -20,6 +20,11 @@ from ml_ui.utils import setup_logging
 
 POLL_SECONDS = 0.5
 
+
+def _sanitize_for_log(value: object) -> str:
+    return str(value).replace("\r", "").replace("\n", "")
+
+
 # (selectbox key, label, value sent to serving)
 _BLOCK_SIZE_OPTIONS: list[tuple[str, str, str | int]] = [
     ("cube root", "Cube root of sample length", "cube root"),
@@ -222,7 +227,7 @@ def main() -> None:
         try:
             job_id = start_job(payload, serving_url)
             st.session_state["job_id"] = job_id
-            logger.info("Started job %s", job_id)
+            logger.info("Started job %s", _sanitize_for_log(job_id))
         except Exception as exc:
             st.error(f"Failed to start job: {exc}")
             st.stop()

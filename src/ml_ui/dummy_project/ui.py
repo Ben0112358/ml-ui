@@ -1,3 +1,4 @@
+import json
 import logging
 
 import requests
@@ -13,7 +14,9 @@ def main() -> None:
     raw = st.text_area("Input list", value="[1, 2, 3]")
     if st.button("Predict"):
         try:
-            data = eval(raw, {"__builtins__": {}}, {})
+            data = json.loads(raw)
+            if not isinstance(data, list):
+                raise ValueError("Input must be a JSON list.")
             response = requests.post(
                 "http://serving:8000/predict",
                 json={"data": data},
