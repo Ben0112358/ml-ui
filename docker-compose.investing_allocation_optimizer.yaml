@@ -15,6 +15,7 @@ services:
       - DOCKER_NETWORK_NAME=${DOCKER_NETWORK_NAME}
       - OUTPUT_SUFFIX=${OUTPUT_SUFFIX:-investing_allocation_optimizer_local}
       - LOGS_DIR=${LOGS_DIR:-logs/ui}
+      - SERVING_URL=${SERVING_URL:-http://serving:8000}
     ports:
       - "${UI_PORT}:8080"
     networks: 

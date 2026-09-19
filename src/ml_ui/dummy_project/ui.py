@@ -1,51 +1,32 @@
+import json
 import logging
-from nicegui import ui
+
 import requests
-import ast
+import streamlit as st
+
 from ml_ui.utils import setup_logging
 
 
-def main():
+def main() -> None:
     logger = logging.getLogger(__name__)
-
-    logger.info("Starting ML UI")
-
-    ui.label("ML Prediction UI")
-
-    with ui.row():
-        input_box = ui.textarea(label="Input [1, 2, 3]").props(
-            'autogrow style="width:400px; max-height:200px; overflow:auto"'
-        )
-        output_box = ui.textarea(label="Output").props(
-            "readonly autogrow style="
-            '"width:400px; max-height:200px; overflow:auto"'
-        )
-
-    def predict():
-        logger.info("Predict button pressed")
-        try:
-            data = ast.literal_eval(input_box.value)
-            if not isinstance(data, list) or not all(
-                isinstance(x, (int, float)) for x in data
-            ):
-                raise ValueError("Expected list of numbers")
-            response = requests.post(
-                "http://serving:8000/predict", json={"data": data}
-            )
-            result = response.json()
-            output_box.value = (
-                f"Prediction: {result.get('predictions', result)}"
-            )
-            logger.info(f"Prediction success: {result}")
-        except Exception as e:
-            output_box.text = f"Error: {e}"
-            logger.warning(f"Prediction failed: {e}")
-
-    ui.button("Predict", on_click=predict)
-
-    ui.run(port=8080, reload=False)
-
-
-if __name__ in {"__main__", "__mp_main__"}:
     setup_logging()
+    st.title("ML Prediction UI (dummy)")
+    raw = st.text_area("Input list", value="[1, 2, 3]")
+    if st.button("Predict"):
+        try:
+            data = json.loads(raw)
+            if not isinstance(data, list):
+                raise ValueError("Input must be a JSON list.")
+            response = requests.post(
+                "http://serving:8000/predict",
+                json={"data": data},
+                timeout=30,
+            )
+            st.json(response.json())
+            logger.info("Prediction success")
+        except Exception as exc:
+            st.error(str(exc))
+
+
+if __name__ == "__main__":
     main()

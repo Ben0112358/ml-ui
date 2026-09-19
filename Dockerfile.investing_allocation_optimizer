@@ -24,4 +24,4 @@ COPY --from=builder /root/.config /root/.config
 
 EXPOSE 8080
 
-CMD ["poetry", "run", "python", "-m", "ml_ui.investing_allocation_optimizer.ui"]
+CMD ["poetry", "run", "streamlit", "run", "src/ml_ui/investing_allocation_optimizer/ui.py", "--server.port=8080", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
