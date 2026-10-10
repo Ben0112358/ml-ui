@@ -11,6 +11,12 @@ from ml_ui.board_meeting_protocol.utils.api import (
     poll_job,
     start_job,
 )
+from ml_ui.board_meeting_protocol.utils.history_store import (
+    HistoryStoreError,
+    has_history,
+    load_history,
+    save_history,
+)
 from ml_ui.utils import setup_logging
 
 POLL_SECONDS = 0.5
@@ -55,11 +61,13 @@ def _load_options() -> dict | None:
     return merged
 
 
-def _history_ids() -> list[int]:
-    if "row_ids" not in st.session_state:
-        st.session_state.row_ids = []
+def _history_ids(mode: str) -> list[int]:
+    if "next_row_id" not in st.session_state:
         st.session_state.next_row_id = 0
-    return st.session_state.row_ids
+    key = f"row_ids-{mode}"
+    if key not in st.session_state:
+        st.session_state[key] = []
+    return st.session_state[key]
 
 
 def main() -> None:
@@ -116,8 +124,13 @@ def main() -> None:
         row_model = st.selectbox("Model for history rows", models)
         orchestrator_model = st.selectbox("Model for the orchestrator", models)
 
+    _apply_pending_restore()
     max_rows = int(options.get("max_rows", 3))
-    row_ids = _history_ids()
+    _maybe_autoload(mode)
+    row_ids = _history_ids(mode)
+    if has_history(mode) and st.button("Reload saved history"):
+        st.session_state.pending_restore = mode
+        st.rerun()
     if len(row_ids) < max_rows and st.button("Add history row"):
         row_ids.append(st.session_state.next_row_id)
         st.session_state.next_row_id += 1
@@ -127,14 +140,14 @@ def main() -> None:
     rows: list[dict] = []
     for number, row_id in enumerate(list(row_ids), start=1):
         st.subheader(f"History row {number}")
-        if st.button("Remove this row", key=f"remove-{row_id}"):
+        if st.button("Remove this row", key=f"remove-{mode}-{row_id}"):
             row_ids.remove(row_id)
             st.rerun()
         columns = st.columns(2)
         with columns[0]:
-            left = _upload(left_label, f"{mode}-left-{row_id}")
+            left = _document(left_label, mode, row_id, "left")
         with columns[1]:
-            middle = _upload(middle_label, f"{mode}-middle-{row_id}")
+            middle = _document(middle_label, mode, row_id, "middle")
         feedback = st.text_area(
             right_label,
             key=f"{mode}-feedback-{row_id}",
@@ -152,6 +165,13 @@ def main() -> None:
                 "note": note.strip(),
             }
         )
+    if st.button("Save history"):
+        try:
+            save_history(mode, rows)
+        except HistoryStoreError as exc:
+            st.error(str(exc))
+        else:
+            st.success("Saved this mode's history.")
 
     st.subheader(input_label)
     new_file = st.file_uploader(
@@ -192,6 +212,77 @@ def main() -> None:
             st.stop()
 
     _show_active_job()
+
+
+def _apply_pending_restore() -> None:
+    mode = st.session_state.pop("pending_restore", None)
+    if not mode:
+        return
+    try:
+        rows = load_history(mode) or []
+    except HistoryStoreError:
+        return
+    _install_rows(mode, rows)
+    done = st.session_state.setdefault("history_autoloaded", [])
+    if mode not in done:
+        done.append(mode)
+
+
+def _maybe_autoload(mode: str) -> None:
+    done = st.session_state.setdefault("history_autoloaded", [])
+    row_ids = _history_ids(mode)
+    if mode in done or row_ids:
+        return
+    done.append(mode)
+    if not has_history(mode):
+        return
+    saved = load_history(mode) or []
+    if saved:
+        _install_rows(mode, saved)
+
+
+def _install_rows(mode: str, rows: list[dict]) -> None:
+    if "next_row_id" not in st.session_state:
+        st.session_state.next_row_id = 0
+    held = _held_files()
+    old_ids = list(st.session_state.get(f"row_ids-{mode}") or [])
+    for row_id in old_ids:
+        for kind in ("feedback", "note", "left", "middle"):
+            st.session_state.pop(f"{mode}-{kind}-{row_id}", None)
+        held.pop(f"{mode}-left-{row_id}", None)
+        held.pop(f"{mode}-middle-{row_id}", None)
+    new_ids = []
+    for row in rows[:3]:
+        row_id = st.session_state.next_row_id
+        st.session_state.next_row_id += 1
+        new_ids.append(row_id)
+        st.session_state[f"{mode}-feedback-{row_id}"] = (
+            row.get("feedback") or ""
+        )
+        st.session_state[f"{mode}-note-{row_id}"] = row.get("note") or ""
+        if row.get("left"):
+            held[f"{mode}-left-{row_id}"] = row["left"]
+        if row.get("middle"):
+            held[f"{mode}-middle-{row_id}"] = row["middle"]
+    st.session_state[f"row_ids-{mode}"] = new_ids
+
+
+def _held_files() -> dict:
+    if "held_files" not in st.session_state:
+        st.session_state.held_files = {}
+    return st.session_state.held_files
+
+
+def _document(label: str, mode: str, row_id: int, side: str):
+    key = f"{mode}-{side}-{row_id}"
+    held = _held_files().get(key)
+    upload_label = f"Replace {label}" if held else label
+    if held:
+        st.caption(f"Saved file: {held.get('filename')}")
+    uploaded = _upload(upload_label, key)
+    if uploaded is not None:
+        return uploaded
+    return held
 
 
 def _show_active_job() -> None:
