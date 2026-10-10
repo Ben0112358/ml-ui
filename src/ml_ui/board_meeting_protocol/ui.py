@@ -73,8 +73,8 @@ def main() -> None:
         "using the font and margins of the latest finished protocol when it "
         "can. Logos and tables are not copied. "
         "Reviewing returns feedback text you can copy. Nothing is sent. "
-        "A HIGH UNCERTAINTY line is a part to fill in yourself, "
-        "or to explain in an optional note."
+        "A HIGH UNCERTAINTY line names what is unclear. "
+        "Fill that part in by hand or with an optional note."
     )
     options = _load_options()
     if options is None:
