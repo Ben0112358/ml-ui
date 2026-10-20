@@ -136,6 +136,12 @@ src/ml_ui/<new_project>/
 
 ---
 
+## board_meeting_protocol
+
+Streamlit page with writing and reviewing modes. History rows are optional, up to three. Each row you add needs its first two documents. The optional third input is pasted email text in both modes. Writing downloads a protocol in the same file type as the new notes, following the font and margins of the latest finished protocol when it can. Reviewing shows short feedback text you can copy, as a nested list of edits. Nothing is sent. A HIGH UNCERTAINTY line names what is unclear. Fill that part in by hand or with an optional note. Saved history is one file per mode under `$ML_HOMELAB_ROOT/.local/board_meeting_protocol/`, outside the git repos.
+
+The backend list comes from serving. When the Cursor backend is selected, the page asks for one model for the history rows and a separate model for the orchestrator. Keys stay in the serving environment; the page does not ask for them.
+
 ## Testing
 
 Run unit tests with Poetry:
