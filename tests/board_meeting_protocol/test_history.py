@@ -37,6 +37,15 @@ def test_history_round_trip_overwrites_one_file(tmp_path, monkeypatch):
     assert not has_history("reviewing")
 
 
+def test_corrupt_history_file_raises(tmp_path, monkeypatch):
+    monkeypatch.setenv("ML_HOMELAB_ROOT", str(tmp_path))
+    path = history_path("writing")
+    path.parent.mkdir(parents=True, mode=0o700)
+    path.write_text("{", encoding="utf-8")
+    with pytest.raises(HistoryStoreError, match="could not read writing.json"):
+        load_history("writing")
+
+
 def test_history_save_refuses_without_a_root(monkeypatch):
     monkeypatch.delenv("ML_HOMELAB_ROOT", raising=False)
     with pytest.raises(HistoryStoreError):

@@ -28,7 +28,10 @@ def load_history(mode: str, root: str | None = None) -> list[dict] | None:
     path = history_path(mode, root)
     if not path.is_file():
         return None
-    data = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise HistoryStoreError(f"could not read {path.name}") from exc
     rows = data.get("rows") if isinstance(data, dict) else None
     if not isinstance(rows, list):
         return []

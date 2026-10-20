@@ -220,7 +220,8 @@ def _apply_pending_restore() -> None:
         return
     try:
         rows = load_history(mode) or []
-    except HistoryStoreError:
+    except HistoryStoreError as exc:
+        st.warning(f"Saved history could not be loaded: {exc}")
         return
     _install_rows(mode, rows)
     done = st.session_state.setdefault("history_autoloaded", [])
@@ -236,7 +237,11 @@ def _maybe_autoload(mode: str) -> None:
     done.append(mode)
     if not has_history(mode):
         return
-    saved = load_history(mode) or []
+    try:
+        saved = load_history(mode) or []
+    except HistoryStoreError as exc:
+        st.warning(f"Saved history could not be loaded: {exc}")
+        return
     if saved:
         _install_rows(mode, saved)
 
