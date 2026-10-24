@@ -17,6 +17,7 @@ pyyaml = ">=6.0.2,<7.0.0"
 requests = ">=2.33.0,<3.0.0"
 urllib3 = ">=2.7.0,<3.0.0"
 certifi = ">=2026.10.19"
+pillow = ">=13.0.0,<14"
 
 
 [tool.poetry.group.dev.dependencies]
