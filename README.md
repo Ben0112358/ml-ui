@@ -79,11 +79,13 @@ For more control, the following can be exported:
 ```bash
 export LOGS_DIR=/path/to/logs
 export OUTPUT_SUFFIX=some_suffix
+export SERVING_URL=http://serving:8000
 ```
 
 **Notes**:
 - The UI is exposed on `localhost:$UI_PORT`.  
 - Ensure the same `DOCKER_NETWORK_NAME` is used as in `ml-serving` if the UI needs to access its endpoints.
+- `SERVING_URL` is the base address of the `ml-serving` API used by `investing_allocation_optimizer` and `board_meeting_protocol`. Their Compose files default it to `http://serving:8000`. For `investing_allocation_optimizer`, the host must be `serving`, `localhost`, or `127.0.0.1`.
 
 ---
 
