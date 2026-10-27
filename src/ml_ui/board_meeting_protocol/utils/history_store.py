@@ -17,11 +17,14 @@ def history_path(mode: str, root: str | None = None) -> Path:
 
 def save_history(mode: str, rows: list[dict], root: str | None = None) -> None:
     directory = _store_dir(root)
-    directory.mkdir(parents=True, mode=0o700, exist_ok=True)
-    directory.chmod(0o700)
     path = history_path(mode, root)
     payload = {"rows": [_stored_row(row) for row in rows[:3]]}
-    _write_private(path, json.dumps(payload))
+    try:
+        directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+        directory.chmod(0o700)
+        _write_private(path, json.dumps(payload))
+    except OSError as exc:
+        raise HistoryStoreError(f"could not write {path.name}") from exc
 
 
 def load_history(mode: str, root: str | None = None) -> list[dict] | None:
