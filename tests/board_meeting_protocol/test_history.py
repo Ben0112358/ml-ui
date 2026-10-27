@@ -50,3 +50,24 @@ def test_history_save_refuses_without_a_root(monkeypatch):
     monkeypatch.delenv("ML_HOMELAB_ROOT", raising=False)
     with pytest.raises(HistoryStoreError):
         save_history("writing", [])
+
+
+def test_history_save_wraps_a_blocked_store_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv("ML_HOMELAB_ROOT", str(tmp_path))
+    blocker = tmp_path / ".local" / "board_meeting_protocol"
+    blocker.parent.mkdir()
+    blocker.write_text("not a directory", encoding="utf-8")
+    with pytest.raises(
+        HistoryStoreError, match="could not write writing.json"
+    ):
+        save_history("writing", [_row()])
+
+
+def test_history_save_wraps_an_unwritable_history_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("ML_HOMELAB_ROOT", str(tmp_path))
+    path = history_path("writing")
+    path.mkdir(parents=True, mode=0o700)
+    with pytest.raises(
+        HistoryStoreError, match="could not write writing.json"
+    ):
+        save_history("writing", [_row()])
