@@ -15,6 +15,10 @@ def serving_base_url() -> str:
     return f"http://127.0.0.1:{port}"
 
 
+def _resolve_base_url(base_url: str | None) -> str:
+    return (base_url or serving_base_url()).rstrip("/")
+
+
 def merge_options(
     fresh: dict[str, Any], cached: dict[str, Any] | None
 ) -> dict[str, Any]:
@@ -33,7 +37,7 @@ def merge_options(
 
 
 def fetch_options(base_url: str | None = None) -> dict[str, Any]:
-    url = (base_url or serving_base_url()).rstrip("/")
+    url = _resolve_base_url(base_url)
     response = requests.get(f"{url}/options", timeout=30)
     response.raise_for_status()
     return response.json()
@@ -84,14 +88,14 @@ def _clean_row(row: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def start_job(payload: dict[str, Any], base_url: str | None = None) -> str:
-    url = (base_url or serving_base_url()).rstrip("/")
+    url = _resolve_base_url(base_url)
     response = requests.post(f"{url}/jobs", json=payload, timeout=60)
     response.raise_for_status()
     return response.json()["job_id"]
 
 
 def poll_job(job_id: str, base_url: str | None = None) -> dict[str, Any]:
-    url = (base_url or serving_base_url()).rstrip("/")
+    url = _resolve_base_url(base_url)
     response = requests.get(f"{url}/jobs/{job_id}", timeout=30)
     response.raise_for_status()
     return response.json()
