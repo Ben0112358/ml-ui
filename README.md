@@ -18,8 +18,8 @@ To get an overview of how all sub-repos in the full pipeline are tied together, 
 
 ```
 ml-ui/
-├── docker-compose.dummy_project.yaml   # Docker Compose file for containerized run
-├── Dockerfile.dummy_project            # Dockerfile for containerized project
+├── docker-compose.<project_name>.yaml  # Docker Compose file per project (containerized run)
+├── Dockerfile.<project_name>           # Dockerfile per project
 ├── LICENSE
 ├── poetry.lock
 ├── pyproject.toml
@@ -27,13 +27,15 @@ ml-ui/
 ├── src/
 │   └── ml_ui/
 │       ├── config.py                   # Global configuration (paths, suffixes)
-│       ├── dummy_project/
+│       ├── dummy_project/              # Minimal example project
 │       │   ├── ui.py                   # Core UI logic
 │       │   ├── utils/                  # Project-specific helpers
 │       │   ├── __main__.py             # Local dev CLI entrypoint
 │       │   └── __init__.py
+│       ├── investing_allocation_optimizer/  # Same layout as dummy_project
+│       ├── board_meeting_protocol/     # Same layout as dummy_project
 │       └── utils/                      # Shared utils (logging, etc.)
-└── tests/                              # Unit tests
+└── tests/                              # Unit tests (mirrors the src/ml_ui layout)
 ```
 
 ---
@@ -42,7 +44,7 @@ ml-ui/
 
 - **OS**: Linux or macOS  
 - **Docker**: Installed and running  
-- **Python**: 3.13 (`>=3.13,<3.14`); use `poetry install --sync`  
+- **Python**: 3.13 (`>=3.13,<3.14`); install dependencies with `poetry sync`  
 - **Poetry**: For dependency management  
 
 Set the base directory where shared ML assets and configs are stored:
