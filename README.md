@@ -93,13 +93,13 @@ export SERVING_URL=http://serving:8000
 
 ## Python run (less control; simplified)
 
-Run `ml-ui` locally with sensible defaults:
+`python -m ml_ui.<project_name>` is a shortcut for the containerized run above. It calls `docker compose -f docker-compose.<project_name>.yaml up --build`, so Docker is still required, and the defaults from the project's Compose file apply. Run it from the repository root, since the Compose file path is relative, and through Poetry after `poetry sync`, so that `ml_ui` can be imported:
 
 ```bash
 export ML_HOMELAB_ROOT=/path/to/ml_homelab_root
 export DOCKER_NETWORK_NAME=<network_name>
 export UI_PORT=<port_number>
-python -m ml_ui.<project_name>
+poetry run python -m ml_ui.<project_name>
 ```
 
 Or with more control over directories and outputs:
@@ -111,7 +111,7 @@ export UI_PORT=<port_number>
 export LOGS_DIR=/path/to/logs
 export OUTPUT_SUFFIX=some_suffix
 
-python -m ml_ui.<project_name>
+poetry run python -m ml_ui.<project_name>
 ```
 
 Also here, the UI will be exposed on `localhost:$UI_PORT`.  
