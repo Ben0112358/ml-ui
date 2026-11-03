@@ -180,7 +180,8 @@ def cancel_job(
 ) -> None:
     ep = endpoint or default_serving_endpoint()
     safe_id = _validated_job_id(job_id)
-    requests.delete(
+    resp = requests.delete(
         ep.url_path(f"/jobs/{safe_id}"),
         timeout=30,
     )
+    resp.raise_for_status()

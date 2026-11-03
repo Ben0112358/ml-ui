@@ -64,3 +64,22 @@ def test_format_comparison_table():
 def test_weights_dataframe():
     df = weights_dataframe({"total-world": 0.6, "growth": 0.4})
     assert df["weight"].sum() == 1.0
+
+
+def test_cancel_job_raises_on_http_error(monkeypatch):
+    from requests import HTTPError
+
+    from ml_ui.investing_allocation_optimizer.utils.api import cancel_job
+
+    class FakeResponse:
+        def raise_for_status(self):
+            raise HTTPError("500 Server Error")
+
+    monkeypatch.setattr(
+        "ml_ui.investing_allocation_optimizer.utils.api.requests.delete",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    endpoint = endpoint_from_host_port("127.0.0.1", 8000)
+    job_id = "12345678-1234-1234-1234-123456789abc"
+    with pytest.raises(HTTPError):
+        cancel_job(job_id, endpoint)
