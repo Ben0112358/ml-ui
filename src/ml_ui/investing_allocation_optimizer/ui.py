@@ -45,6 +45,25 @@ def _metric_labels(metrics: list[dict]) -> dict[str, str]:
     return {m["key"]: m.get("label", m["key"]) for m in metrics}
 
 
+def _render_job_progress(
+    job: dict,
+    total: int,
+    progress_bar,
+    status_slot,
+    chart_slot,
+) -> None:
+    done = job.get("trials_done", 0)
+    progress_bar.progress(min(1.0, done / max(total, 1)))
+    status_slot.write(
+        f"Status: **{job.get('status')}** — "
+        f"trials {done}/{total}, "
+        f"best: {job.get('best_value')}"
+    )
+    hist_df = history_dataframe(job.get("history") or [])
+    if not hist_df.empty:
+        chart_slot.line_chart(hist_df.set_index("trial")[["best_value"]])
+
+
 def main() -> None:
     setup_logging()
     logger = logging.getLogger(__name__)
@@ -254,33 +273,15 @@ def main() -> None:
     job_id = st.session_state.get("job_id")
     if job_id:
         job = poll_job(job_id, serving_endpoint)
-        done = job.get("trials_done", 0)
         total = job.get("n_trials", 1)
-        progress_bar.progress(min(1.0, done / max(total, 1)))
-        status_slot.write(
-            f"Status: **{job.get('status')}** — "
-            f"trials {done}/{total}, "
-            f"best: {job.get('best_value')}"
-        )
-        hist_df = history_dataframe(job.get("history") or [])
-        if not hist_df.empty:
-            chart_slot.line_chart(hist_df.set_index("trial")[["best_value"]])
+        _render_job_progress(job, total, progress_bar, status_slot, chart_slot)
 
         while job.get("status") == "running":
             time.sleep(POLL_SECONDS)
             job = poll_job(job_id, serving_endpoint)
-            done = job.get("trials_done", 0)
-            progress_bar.progress(min(1.0, done / max(total, 1)))
-            status_slot.write(
-                f"Status: **{job.get('status')}** — "
-                f"trials {done}/{total}, "
-                f"best: {job.get('best_value')}"
+            _render_job_progress(
+                job, total, progress_bar, status_slot, chart_slot
             )
-            hist_df = history_dataframe(job.get("history") or [])
-            if not hist_df.empty:
-                chart_slot.line_chart(
-                    hist_df.set_index("trial")[["best_value"]]
-                )
 
         if job.get("status") == "completed" and job.get("result"):
             result = job["result"]
