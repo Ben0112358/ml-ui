@@ -3,6 +3,7 @@ import pytest
 from ml_ui.investing_allocation_optimizer.utils.api import (
     build_job_payload,
     endpoint_from_host_port,
+    parse_serving_base_url,
     serving_base_url,
 )
 from ml_ui.investing_allocation_optimizer.utils.format import (
@@ -83,3 +84,46 @@ def test_cancel_job_raises_on_http_error(monkeypatch):
     job_id = "12345678-1234-1234-1234-123456789abc"
     with pytest.raises(HTTPError):
         cancel_job(job_id, endpoint)
+
+
+def test_parse_serving_base_url_accepts_trailing_slash():
+    ep = parse_serving_base_url("http://serving:8000/")
+    assert ep.origin() == "http://serving:8000"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected_port"),
+    [("http://serving", 80), ("https://serving", 443)],
+)
+def test_parse_serving_base_url_default_port_follows_scheme(
+    raw, expected_port
+):
+    assert parse_serving_base_url(raw).port == expected_port
+
+
+def test_parse_serving_base_url_rejects_other_schemes():
+    with pytest.raises(ValueError, match="http or https"):
+        parse_serving_base_url("ftp://serving:8000")
+
+
+def test_parse_serving_base_url_rejects_credentials():
+    with pytest.raises(ValueError, match="credentials"):
+        parse_serving_base_url("http://user@serving:8000")
+
+
+def test_parse_serving_base_url_rejects_path():
+    with pytest.raises(ValueError, match="path"):
+        parse_serving_base_url("http://serving:8000/api")
+
+
+@pytest.mark.parametrize(
+    "raw", ["http://serving:8000?x=1", "http://serving:8000#top"]
+)
+def test_parse_serving_base_url_rejects_query_and_fragment(raw):
+    with pytest.raises(ValueError, match="query or fragment"):
+        parse_serving_base_url(raw)
+
+
+def test_parse_serving_base_url_rejects_untrusted_host():
+    with pytest.raises(ValueError, match="not allowed"):
+        parse_serving_base_url("http://example.com:8000")
