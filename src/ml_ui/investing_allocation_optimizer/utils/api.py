@@ -35,6 +35,11 @@ class ServingEndpoint:
 
 
 def endpoint_from_host_port(host: str, port: int) -> ServingEndpoint:
+    """Build an http endpoint from a host and port chosen in the UI.
+
+    Raises ValueError if the host is not 127.0.0.1, localhost, or
+    serving, or if the port is not an int between 1 and 65535.
+    """
     if host not in _ALLOWED_SERVING_HOSTS:
         raise ValueError(
             "Serving host is not allowed. "
@@ -73,6 +78,19 @@ def _endpoint_from_parsed_url(raw: str) -> ServingEndpoint:
 
 
 def default_serving_endpoint() -> ServingEndpoint:
+    """Resolve the serving endpoint from the environment.
+
+    Resolution order:
+
+    1. ``SERVING_URL``, if non-empty, validated by ``parse_serving_base_url``.
+    2. Inside a Docker container (``/.dockerenv`` exists):
+       ``http://serving:8000``.
+    3. Otherwise ``http://127.0.0.1:<SERVING_PORT>``, where
+       ``SERVING_PORT`` defaults to 8000.
+
+    Raises ValueError if ``SERVING_URL`` is invalid or ``SERVING_PORT``
+    is not numeric.
+    """
     explicit = os.environ.get("SERVING_URL", "").strip()
     if explicit:
         return _endpoint_from_parsed_url(explicit)
@@ -89,6 +107,16 @@ def serving_base_url() -> str:
 
 
 def parse_serving_base_url(raw: str) -> ServingEndpoint:
+    """Parse and validate a serving base URL such as http://serving:8000.
+
+    Surrounding whitespace and trailing slashes are ignored. The scheme
+    must be http or https, the host must be 127.0.0.1, localhost, or
+    serving, and the URL must not contain credentials, a path, a query,
+    or a fragment. Without an explicit port, 80 (http) or 443 (https) is
+    used.
+
+    Raises ValueError if any of these checks fails.
+    """
     return _endpoint_from_parsed_url(raw)
 
 
@@ -104,6 +132,11 @@ DEFAULT_SERVING_URL = serving_base_url()
 
 
 def fetch_options(endpoint: ServingEndpoint | None = None) -> dict[str, Any]:
+    """Fetch the optimizer options from ``GET /options``.
+
+    Uses ``default_serving_endpoint()`` when ``endpoint`` is None.
+    Raises requests.HTTPError on an error response.
+    """
     ep = endpoint or default_serving_endpoint()
     resp = requests.get(ep.url_path("/options"), timeout=30)
     resp.raise_for_status()
@@ -149,6 +182,13 @@ def start_job(
     payload: dict[str, Any],
     endpoint: ServingEndpoint | None = None,
 ) -> str:
+    """Start an optimization job with ``POST /jobs`` and return its id.
+
+    ``payload`` is usually built with ``build_job_payload``. Uses
+    ``default_serving_endpoint()`` when ``endpoint`` is None. Raises
+    requests.HTTPError on an error response and ValueError if the
+    returned job id is not a UUID.
+    """
     ep = endpoint or default_serving_endpoint()
     resp = requests.post(
         ep.url_path("/jobs"),
@@ -164,6 +204,12 @@ def poll_job(
     job_id: str,
     endpoint: ServingEndpoint | None = None,
 ) -> dict[str, Any]:
+    """Return the current state of a job from ``GET /jobs/<job_id>``.
+
+    Uses ``default_serving_endpoint()`` when ``endpoint`` is None. Raises
+    ValueError if ``job_id`` is not a UUID and requests.HTTPError on an
+    error response.
+    """
     ep = endpoint or default_serving_endpoint()
     safe_id = _validated_job_id(job_id)
     resp = requests.get(
@@ -178,6 +224,12 @@ def cancel_job(
     job_id: str,
     endpoint: ServingEndpoint | None = None,
 ) -> None:
+    """Cancel a job with ``DELETE /jobs/<job_id>``.
+
+    Uses ``default_serving_endpoint()`` when ``endpoint`` is None. Raises
+    ValueError if ``job_id`` is not a UUID and requests.HTTPError on an
+    error response.
+    """
     ep = endpoint or default_serving_endpoint()
     safe_id = _validated_job_id(job_id)
     resp = requests.delete(
