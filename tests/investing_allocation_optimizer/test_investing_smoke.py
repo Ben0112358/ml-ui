@@ -127,3 +127,37 @@ def test_parse_serving_base_url_rejects_query_and_fragment(raw):
 def test_parse_serving_base_url_rejects_untrusted_host():
     with pytest.raises(ValueError, match="not allowed"):
         parse_serving_base_url("http://example.com:8000")
+
+
+@pytest.mark.parametrize("job_id", [123, None])
+def test_start_job_rejects_non_string_job_id(monkeypatch, job_id):
+    from ml_ui.investing_allocation_optimizer.utils.api import start_job
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"job_id": job_id}
+
+    monkeypatch.setattr(
+        "ml_ui.investing_allocation_optimizer.utils.api.requests.post",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    endpoint = endpoint_from_host_port("127.0.0.1", 8000)
+    with pytest.raises(ValueError, match="Invalid job id"):
+        start_job({}, endpoint)
+
+
+@pytest.mark.parametrize("name", ["poll_job", "cancel_job"])
+def test_job_id_argument_must_be_a_string(monkeypatch, name):
+    from ml_ui.investing_allocation_optimizer.utils import api
+
+    def fail(*args, **kwargs):
+        raise AssertionError("no request expected")
+
+    monkeypatch.setattr(api.requests, "get", fail)
+    monkeypatch.setattr(api.requests, "delete", fail)
+    endpoint = endpoint_from_host_port("127.0.0.1", 8000)
+    with pytest.raises(ValueError, match="Invalid job id"):
+        getattr(api, name)(None, endpoint)

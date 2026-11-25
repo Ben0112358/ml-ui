@@ -121,7 +121,7 @@ def parse_serving_base_url(raw: str) -> ServingEndpoint:
 
 
 def _validated_job_id(job_id: str) -> str:
-    if not _JOB_ID_RE.match(job_id):
+    if not isinstance(job_id, str) or not _JOB_ID_RE.match(job_id):
         raise ValueError("Invalid job id.")
     uuid.UUID(job_id)
     return job_id
