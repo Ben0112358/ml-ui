@@ -62,12 +62,16 @@ def _load_options() -> dict | None:
 
 
 def _history_ids(mode: str) -> list[int]:
-    if "next_row_id" not in st.session_state:
-        st.session_state.next_row_id = 0
     key = f"row_ids-{mode}"
     if key not in st.session_state:
         st.session_state[key] = []
     return st.session_state[key]
+
+
+def _new_row_id() -> int:
+    row_id = st.session_state.setdefault("next_row_id", 0)
+    st.session_state.next_row_id = row_id + 1
+    return row_id
 
 
 def main() -> None:
@@ -132,8 +136,7 @@ def main() -> None:
         st.session_state.pending_restore = mode
         st.rerun()
     if len(row_ids) < max_rows and st.button("Add history row"):
-        row_ids.append(st.session_state.next_row_id)
-        st.session_state.next_row_id += 1
+        row_ids.append(_new_row_id())
     if not row_ids:
         st.info("No history rows. The run uses only the new document.")
 
@@ -218,10 +221,8 @@ def _apply_pending_restore() -> None:
     mode = st.session_state.pop("pending_restore", None)
     if not mode:
         return
-    try:
-        rows = load_history(mode) or []
-    except HistoryStoreError as exc:
-        st.warning(f"Saved history could not be loaded: {exc}")
+    rows = _load_saved_rows(mode)
+    if rows is None:
         return
     _install_rows(mode, rows)
     done = st.session_state.setdefault("history_autoloaded", [])
@@ -237,18 +238,20 @@ def _maybe_autoload(mode: str) -> None:
     done.append(mode)
     if not has_history(mode):
         return
-    try:
-        saved = load_history(mode) or []
-    except HistoryStoreError as exc:
-        st.warning(f"Saved history could not be loaded: {exc}")
-        return
+    saved = _load_saved_rows(mode)
     if saved:
         _install_rows(mode, saved)
 
 
+def _load_saved_rows(mode: str) -> list[dict] | None:
+    try:
+        return load_history(mode) or []
+    except HistoryStoreError as exc:
+        st.warning(f"Saved history could not be loaded: {exc}")
+        return None
+
+
 def _install_rows(mode: str, rows: list[dict]) -> None:
-    if "next_row_id" not in st.session_state:
-        st.session_state.next_row_id = 0
     held = _held_files()
     old_ids = list(st.session_state.get(f"row_ids-{mode}") or [])
     for row_id in old_ids:
@@ -258,8 +261,7 @@ def _install_rows(mode: str, rows: list[dict]) -> None:
         held.pop(f"{mode}-middle-{row_id}", None)
     new_ids = []
     for row in rows[:3]:
-        row_id = st.session_state.next_row_id
-        st.session_state.next_row_id += 1
+        row_id = _new_row_id()
         new_ids.append(row_id)
         st.session_state[f"{mode}-feedback-{row_id}"] = (
             row.get("feedback") or ""
